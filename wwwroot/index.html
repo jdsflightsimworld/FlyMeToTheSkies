@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>MSFS Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    #panel {
+      position: absolute; top: 10px; right: 10px; z-index: 1000;
+      background: rgba(255,255,255,.92); padding: 10px 14px; border-radius: 8px;
+      font: 13px/1.5 system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    .plane { font-size: 28px; line-height: 28px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="panel">
+    <div id="status">Conectando…</div>
+    <div id="info"></div>
+    <label><input type="checkbox" id="follow" checked> Seguir avión</label>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([40.4168, -3.7038], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let marker = null;
+    const track = L.polyline([], { color: '#e63946', weight: 3 }).addTo(map);
+
+    // El emoji ✈ apunta a 45°, por eso se resta 45 al rumbo
+    const planeIcon = hdg => L.divIcon({
+      className: '',
+      html: `<div class="plane" style="transform: rotate(${hdg - 45}deg)">✈️</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
+    });
+
+    async function update() {
+      try {
+        const r = await fetch('/api/position');
+        const { connected, aircraft: a } = await r.json();
+        document.getElementById('status').textContent =
+          connected ? '🟢 Conectado a MSFS' : '🔴 Esperando a MSFS…';
+        if (!a) return;
+
+        const pos = [a.latitude, a.longitude];
+        if (!marker) {
+          marker = L.marker(pos, { icon: planeIcon(a.headingDeg) }).addTo(map);
+          map.setView(pos, 10);
+        } else {
+          marker.setLatLng(pos);
+          marker.setIcon(planeIcon(a.headingDeg));
+        }
+        track.addLatLng(pos);
+        if (document.getElementById('follow').checked) map.panTo(pos);
+
+        document.getElementById('info').innerHTML = `
+          <b>${a.title}</b><br>
+          Alt: ${Math.round(a.altitudeFt)} ft · VS: ${Math.round(a.verticalSpeedFpm)} fpm<br>
+          IAS: ${Math.round(a.iasKt)} kt · GS: ${Math.round(a.groundSpeedKt)} kt<br>
+          Rumbo: ${Math.round(a.headingDeg)}° ${a.onGround ? '· En tierra' : ''}`;
+      } catch {
+        document.getElementById('status').textContent = '⚠️ Sin conexión con la app';
+      }
+    }
+
+    update();
+    setInterval(update, 1000);
+  </script>
+</body>
+</html>
