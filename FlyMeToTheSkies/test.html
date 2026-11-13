@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Aircraft position</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; }
+  pre { background: #f3f3f3; padding: 1rem; }
+</style>
+</head>
+<body>
+<h1>Aircraft position</h1>
+<p id="pos">Waiting for data...</p>
+<pre id="raw"></pre>
+<script>
+  const API = "http://localhost:8080/api/position";
+
+  async function update() {
+    try {
+      const res = await fetch(API);
+      const data = await res.json();
+      document.getElementById("raw").textContent = JSON.stringify(data, null, 2);
+      document.getElementById("pos").textContent = data.valid
+        ? `Lat: ${data.latitude.toFixed(6)}  Lon: ${data.longitude.toFixed(6)}`
+        : (data.connected ? "Connected, no position yet" : "Simulator not connected");
+    } catch (e) {
+      document.getElementById("pos").textContent = "Cannot reach the API: " + e;
+    }
+  }
+
+  update();
+  setInterval(update, 1000);
+</script>
+</body>
+</html>
